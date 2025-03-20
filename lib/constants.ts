@@ -1,4 +1,11 @@
-import { Code, FileJson, FileText, FileCode, Palette } from "lucide-react";
+import {
+  Code,
+  FileJson,
+  FileText,
+  FileCode,
+  Palette,
+  Youtube,
+} from "lucide-react";
 
 export const TOOLS = [
   {
@@ -30,5 +37,11 @@ export const TOOLS = [
     href: "/tools/markdown",
     description: "Edit and preview Markdown content",
     icon: FileText,
+  },
+  {
+    name: "YouTube Transcript",
+    href: "/tools/youtube-transcript",
+    description: "Extract and view transcripts from YouTube videos",
+    icon: Youtube,
   },
 ];
