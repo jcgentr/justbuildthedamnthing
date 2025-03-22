@@ -146,23 +146,43 @@ export default function YouTubeTranscriptPage() {
     return currentTime >= item.start && currentTime < segmentEnd;
   });
 
+  // Custom scroll function to scroll only within the container
+  const scrollToActiveSegment = (index: number) => {
+    if (index === -1 || !transcriptContainerRef.current) return;
+
+    const container = transcriptContainerRef.current;
+    const element = document.getElementById(`transcript-segment-${index}`);
+
+    if (!element) return;
+
+    // Calculate positions
+    const containerRect = container.getBoundingClientRect();
+    const elementRect = element.getBoundingClientRect();
+
+    // Calculate the element's position relative to the container
+    const elementTop = elementRect.top - containerRect.top;
+    const elementBottom = elementRect.bottom - containerRect.top;
+
+    // Calculate center position to scroll to
+    const centerPosition =
+      elementTop - containerRect.height / 2 + elementRect.height / 2;
+
+    // Check if element is already visible in the viewport
+    const isVisible = elementTop >= 0 && elementBottom <= containerRect.height;
+
+    // Only scroll if element is not visible or we're re-enabling auto-scroll
+    if (!isVisible) {
+      container.scrollTo({
+        top: centerPosition + container.scrollTop,
+        behavior: "smooth",
+      });
+    }
+  };
+
   // Scroll active segment into view when it changes
   useEffect(() => {
-    if (
-      activeSegmentIndex !== -1 &&
-      isPlaying &&
-      transcriptContainerRef.current &&
-      autoScroll
-    ) {
-      const activeElement = document.getElementById(
-        `transcript-segment-${activeSegmentIndex}`
-      );
-      if (activeElement) {
-        activeElement.scrollIntoView({
-          behavior: "smooth",
-          block: "center",
-        });
-      }
+    if (activeSegmentIndex !== -1 && isPlaying && autoScroll) {
+      scrollToActiveSegment(activeSegmentIndex);
     }
   }, [activeSegmentIndex, isPlaying, autoScroll]);
 
@@ -171,15 +191,7 @@ export default function YouTubeTranscriptPage() {
 
     // If enabling auto-scroll, immediately scroll to the active segment
     if (value && activeSegmentIndex !== -1) {
-      const activeElement = document.getElementById(
-        `transcript-segment-${activeSegmentIndex}`
-      );
-      if (activeElement) {
-        activeElement.scrollIntoView({
-          behavior: "smooth",
-          block: "center",
-        });
-      }
+      scrollToActiveSegment(activeSegmentIndex);
     }
   };
 
