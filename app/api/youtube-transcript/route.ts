@@ -87,7 +87,16 @@ async function getYoutubeTranscript(
   try {
     // Step 1: Get the video page to extract the transcript data
     const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    const response = await fetch(videoUrl);
+    const response = await fetch(videoUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+        Referer: "https://www.youtube.com/",
+        Origin: "https://www.youtube.com",
+      },
+      cache: "no-store",
+    });
 
     if (!response.ok) {
       throw new Error(`Failed to fetch video page: ${response.status}`);
@@ -132,7 +141,16 @@ async function getYoutubeTranscript(
     }
 
     // Step 5: Fetch the transcript XML
-    const transcriptResponse = await fetch(transcriptData.baseUrl);
+    const transcriptResponse = await fetch(transcriptData.baseUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+        Referer: videoUrl,
+        Origin: "https://www.youtube.com",
+      },
+      cache: "no-store",
+    });
 
     if (!transcriptResponse.ok) {
       throw new Error(
