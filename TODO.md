@@ -1,8 +1,9 @@
 # Tools
 
 - [ ] YouTube transcript extractor
-  - [ ] continue playing on jump to transcript position
-  - [ ] highlight currently playing transcript position
+  - [x] continue playing on jump to transcript position
+  - [x] highlight currently playing transcript position
+  - [x] fix autoscroll into view (Switch for now)
   - [ ] speed up search
 - [ ] pixel art editor
 - [ ] logo generator

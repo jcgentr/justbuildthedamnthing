@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import {
   Loader2,
@@ -13,10 +13,12 @@ import {
   Clock,
 } from "lucide-react";
 import { toast } from "sonner";
+import React from "react";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import {
   TranscriptResponse,
   TranscriptSegment,
@@ -43,7 +45,12 @@ export default function YouTubeTranscriptPage() {
   const [videoReady, setVideoReady] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [autoScroll, setAutoScroll] = useState(true);
   const playerRef = useRef<ReactPlayerInstance | null>(null);
+  const transcriptContainerRef = useRef<HTMLDivElement>(null);
+  const activeSegmentRef = useRef<HTMLDivElement>(null);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -127,8 +134,52 @@ export default function YouTubeTranscriptPage() {
 
   const seekToTimestamp = (seconds: number) => {
     if (playerRef.current) {
-      playerRef.current.seekTo(seconds);
+      playerRef.current.seekTo(seconds, "seconds");
       toast.success(`Jumped to ${formatTime(seconds)}`);
+    }
+  };
+
+  // Find the current active transcript segment based on video time
+  const activeSegmentIndex = transcript.findIndex((item, index) => {
+    const nextItem = transcript[index + 1];
+    const segmentEnd = nextItem ? nextItem.start : item.start + item.duration;
+    return currentTime >= item.start && currentTime < segmentEnd;
+  });
+
+  // Scroll active segment into view when it changes
+  useEffect(() => {
+    if (
+      activeSegmentIndex !== -1 &&
+      isPlaying &&
+      transcriptContainerRef.current &&
+      autoScroll
+    ) {
+      const activeElement = document.getElementById(
+        `transcript-segment-${activeSegmentIndex}`
+      );
+      if (activeElement) {
+        activeElement.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }
+    }
+  }, [activeSegmentIndex, isPlaying, autoScroll]);
+
+  const toggleAutoScroll = (value: boolean) => {
+    setAutoScroll(value);
+
+    // If enabling auto-scroll, immediately scroll to the active segment
+    if (value && activeSegmentIndex !== -1) {
+      const activeElement = document.getElementById(
+        `transcript-segment-${activeSegmentIndex}`
+      );
+      if (activeElement) {
+        activeElement.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }
     }
   };
 
@@ -200,6 +251,10 @@ export default function YouTubeTranscriptPage() {
                   width="100%"
                   height="100%"
                   controls
+                  playing={isPlaying}
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
+                  onProgress={(state) => setCurrentTime(state.playedSeconds)}
                   onReady={() => setVideoReady(true)}
                   onError={(e) => {
                     console.error("Video player error:", e);
@@ -217,27 +272,42 @@ export default function YouTubeTranscriptPage() {
           <Card>
             <CardHeader className="py-4 px-6 flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-lg">Transcript</CardTitle>
-              {transcript.length > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={copyTranscriptToClipboard}
-                  disabled={isCopied}
-                  className="flex items-center gap-2"
-                >
-                  {isCopied ? (
-                    <>
-                      <Check className="h-4 w-4" />
-                      Copied
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-4 w-4" />
-                      Copy Text
-                    </>
-                  )}
-                </Button>
-              )}
+              <div className="flex items-center gap-2">
+                {transcript.length > 0 && (
+                  <div className="flex items-center gap-2 mr-2">
+                    <span className="text-xs text-muted-foreground">
+                      Auto-scroll
+                    </span>
+                    <Switch
+                      checked={autoScroll}
+                      onCheckedChange={toggleAutoScroll}
+                      aria-label="Toggle auto-scroll"
+                      className="cursor-pointer"
+                    />
+                  </div>
+                )}
+                {transcript.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={copyTranscriptToClipboard}
+                    disabled={isCopied}
+                    className="flex items-center gap-2"
+                  >
+                    {isCopied ? (
+                      <>
+                        <Check className="h-4 w-4" />
+                        Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4" />
+                        Copy Text
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             {transcript.length > 0 && (
               <div className="px-6 py-2">
@@ -269,7 +339,10 @@ export default function YouTubeTranscriptPage() {
               </div>
             )}
             <CardContent className="p-0">
-              <div className="max-h-[600px] overflow-y-auto">
+              <div
+                className="max-h-[600px] overflow-y-auto"
+                ref={transcriptContainerRef}
+              >
                 {loading ? (
                   <div className="flex justify-center items-center h-32">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -277,45 +350,56 @@ export default function YouTubeTranscriptPage() {
                 ) : transcript.length > 0 ? (
                   <div className="space-y-0">
                     {(searchTerm ? filteredTranscript : transcript).map(
-                      (item, index) => (
-                        <div
-                          key={index}
-                          className="p-4 hover:bg-muted border-b last:border-0 transition-colors duration-150 cursor-pointer group"
-                          onClick={() => seekToTimestamp(item.start)}
-                        >
-                          <div className="flex items-start">
-                            <div className="flex-1">
-                              <p
-                                className="mb-1"
-                                dangerouslySetInnerHTML={{
-                                  __html: searchTerm
-                                    ? highlightText(item.text, searchTerm)
-                                    : item.text,
+                      (item, index) => {
+                        const isActive =
+                          activeSegmentIndex === index && !searchTerm;
+
+                        return (
+                          <div
+                            id={`transcript-segment-${index}`}
+                            key={index}
+                            className={`p-4 hover:bg-muted border-b last:border-0 transition-colors duration-150 cursor-pointer group ${
+                              isActive
+                                ? "bg-primary/10 border-l-4 border-l-primary"
+                                : ""
+                            }`}
+                            onClick={() => seekToTimestamp(item.start)}
+                            ref={isActive ? activeSegmentRef : null}
+                          >
+                            <div className="flex items-start">
+                              <div className="flex-1">
+                                <p
+                                  className="mb-1"
+                                  dangerouslySetInnerHTML={{
+                                    __html: searchTerm
+                                      ? highlightText(item.text, searchTerm)
+                                      : item.text,
+                                  }}
+                                />
+                                <p className="text-xs text-muted-foreground flex items-center">
+                                  <Clock className="h-3 w-3 mr-1 inline" />
+                                  {formatTime(item.start)} —{" "}
+                                  {formatTime(item.start + item.duration)}
+                                </p>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="opacity-0 group-hover:opacity-100 transition-opacity h-7 w-7 p-0"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  seekToTimestamp(item.start);
                                 }}
-                              />
-                              <p className="text-xs text-muted-foreground flex items-center">
-                                <Clock className="h-3 w-3 mr-1 inline" />
-                                {formatTime(item.start)} —{" "}
-                                {formatTime(item.start + item.duration)}
-                              </p>
+                              >
+                                <Play className="h-3.5 w-3.5" />
+                                <span className="sr-only">
+                                  Play from this point
+                                </span>
+                              </Button>
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="opacity-0 group-hover:opacity-100 transition-opacity h-7 w-7 p-0"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                seekToTimestamp(item.start);
-                              }}
-                            >
-                              <Play className="h-3.5 w-3.5" />
-                              <span className="sr-only">
-                                Play from this point
-                              </span>
-                            </Button>
                           </div>
-                        </div>
-                      )
+                        );
+                      }
                     )}
                   </div>
                 ) : videoReady && !loading ? (
